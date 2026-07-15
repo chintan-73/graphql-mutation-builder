@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -257,22 +258,56 @@
     'collection_reference','page_reference','metaobject_reference','customer_reference',
     'company_reference','order_reference'];
 
+  // Reads the type name off a node, tolerating both { type: { name } } and { type }.
+  function typeOf(n){
+    return n && n.type && n.type.name ? n.type.name : String(n && n.type || '');
+  }
+
+  // Catches list.product_reference as well as product_reference.
+  function isReference(t){
+    return REFERENCE_TYPES.indexOf(String(t).replace(/^list\./, '')) !== -1;
+  }
+
+  // Invented data — a fictional storefront, purely to demo the tool.
   var SAMPLE = {
     data: { metafieldDefinitions: { edges: [
-      { node: { name:"Snowboard length", namespace:"test_data", key:"snowboard_length",
-                description:"The length of the snowboard", type:{name:"dimension"},
-                ownerType:"PRODUCT", validations:[], access:{storefront:"PUBLIC_READ"} } },
-      { node: { name:"Snowboard binding mount", namespace:"test_data", key:"binding_mount",
-                description:"The type of binding mount used on the snowboard",
-                type:{name:"single_line_text_field"}, ownerType:"PRODUCT",
+      { node: { name:"Shelf height", namespace:"demo", key:"shelf_height",
+                description:"Height of the assembled shelf",
+                type:{name:"dimension"}, ownerType:"PRODUCT",
                 validations:[], access:{storefront:"PUBLIC_READ"} } },
-      { node: { name:"title", namespace:"custom", key:"title", description:"",
+
+      { node: { name:"Assembly time", namespace:"demo", key:"assembly_time",
+                description:"Rough build time in minutes",
+                type:{name:"number_integer"}, ownerType:"PRODUCT",
+                validations:[{name:"min", value:"1"}, {name:"max", value:"240"}],
+                access:{storefront:"PUBLIC_READ"} } },
+
+      { node: { name:"Wood finish", namespace:"demo", key:"wood_finish",
+                description:"",
                 type:{name:"single_line_text_field"}, ownerType:"PRODUCT",
+                validations:[{name:"choices", value:"[\"Oak\",\"Walnut\",\"Ash\"]"}],
+                access:{storefront:"PUBLIC_READ"} } },
+
+      { node: { name:"Care guide", namespace:"demo", key:"care_guide",
+                description:"Long-form care and cleaning notes",
+                type:{name:"rich_text_field"}, ownerType:"PRODUCT",
                 validations:[], access:{storefront:"PUBLIC_READ"} } },
-      { node: { name:"video", namespace:"custom", key:"video", description:"",
+
+      { node: { name:"Assembly video", namespace:"demo", key:"assembly_video",
+                description:"",
                 type:{name:"file_reference"}, ownerType:"PRODUCT",
                 validations:[{name:"file_type_options", value:"[\"Video\"]"}],
-                access:{storefront:"PUBLIC_READ"} } }
+                access:{storefront:"PUBLIC_READ"} } },
+
+      { node: { name:"Pairs well with", namespace:"demo", key:"pairs_with",
+                description:"Related products shown on the product page",
+                type:{name:"list.product_reference"}, ownerType:"PRODUCT",
+                validations:[], access:{storefront:"PUBLIC_READ"} } },
+
+      { node: { name:"Internal SKU note", namespace:"demo", key:"sku_note",
+                description:"Warehouse-only note, hidden from the storefront",
+                type:{name:"multi_line_text_field"}, ownerType:"PRODUCT",
+                validations:[], access:{storefront:"NONE"} } }
     ]}}
   };
 
@@ -335,7 +370,7 @@
 
   function buildMutation(nodes, opt){
     var blocks = nodes.map(function(d){
-      var typeName = d.type && d.type.name ? d.type.name : d.type;
+      var typeName = typeOf(d);
       var owner = opt.owner === '__auto' ? (d.ownerType || 'PRODUCT') : opt.owner;
 
       var descLine = '';
@@ -373,9 +408,8 @@
 
   function renderChips(nodes){
     chips.innerHTML = nodes.map(function(d){
-      var t = d.type && d.type.name ? d.type.name : String(d.type);
-      var isRef = REFERENCE_TYPES.indexOf(t) !== -1;
-      return '<span class="chip' + (isRef ? ' chip-ref' : '') + '">' +
+      var t = typeOf(d);
+      return '<span class="chip' + (isReference(t) ? ' chip-ref' : '') + '">' +
              '<b>' + esc(d.namespace + '.' + d.key) + '</b>' +
              '<i>' + esc(t) + '</i></span>';
     }).join('');
@@ -458,10 +492,7 @@
       }
     }
 
-    var refs = nodes.filter(function(n){
-      var t = n.type && n.type.name ? n.type.name : n.type;
-      return REFERENCE_TYPES.indexOf(t) !== -1;
-    });
+    var refs = nodes.filter(function(n){ return isReference(typeOf(n)); });
     if(refs.length){
       notes.push({ type:'info', html:'<span>' + refs.length + ' reference-type definition' + (refs.length>1?'s':'') + ' here (highlighted in blue). The definitions copy fine, but their <em>values</em> point to IDs that only exist on the source store.</span>' });
     }
