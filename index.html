@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Metafield Definition → Mutation Builder</title>
+<title>Definition → Mutation Builder</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
@@ -71,6 +71,20 @@
     }
     .step-live::before { content: "▸ "; }
 
+    /* detected-mode badge */
+    .badge {
+      @apply rounded border border-line bg-panel2 px-[7px] py-[2px] font-mono text-[10.5px]
+             uppercase tracking-[0.05em] text-faint;
+    }
+    .badge-live { @apply border-signaldn bg-signal/[0.07] text-signal; }
+
+    /* read-query tabs */
+    .tab {
+      @apply border-b-2 border-transparent px-1 py-0.5 font-mono text-[11px] text-faint
+             transition-colors hover:text-ink;
+    }
+    .tab-on { @apply border-signal text-signal hover:text-signal; }
+
     /* parsed chips */
     .chip {
       @apply inline-flex items-center overflow-hidden rounded border border-line font-mono text-[11px];
@@ -111,8 +125,8 @@
 
 <header class="flex flex-wrap items-center gap-5 border-b border-line bg-panel px-5 py-3.5">
   <div class="flex items-baseline gap-2.5">
-    <h1 class="text-[15px] font-semibold -tracking-[0.01em]">Metafield Definition Builder</h1>
-    <span class="font-mono text-[11px] text-faint">shopify admin api</span>
+    <h1 class="text-[15px] font-semibold -tracking-[0.01em]">Definition Builder</h1>
+    <span class="font-mono text-[11px] text-faint">metafields &amp; metaobjects · shopify admin api</span>
   </div>
   <div class="flex flex-wrap items-center md:ml-auto" aria-label="Workflow position">
     <div class="step rounded-l">1 · read in graphiql</div>
@@ -127,6 +141,7 @@
   <section class="flex min-h-[60vh] min-w-0 flex-col bg-bg md:min-h-0">
     <div class="flex min-h-[44px] items-center gap-2.5 border-b border-linesoft bg-panel px-4 py-2.5">
       <h2 class="head">Query response</h2>
+      <span id="modeBadge" class="badge">no data</span>
       <span id="inCount" class="font-mono text-[11px] text-faint"></span>
       <div class="ml-auto flex gap-1.5">
         <button id="sampleBtn" class="btn">Load sample</button>
@@ -137,11 +152,11 @@
     <textarea id="input" spellcheck="false"
       class="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3.5 font-mono
              text-[12.5px] leading-[1.65] text-ink placeholder:text-faint focus:outline-none"
-      placeholder='Paste the JSON response from your metafieldDefinitions query.
+      placeholder='Paste the JSON response from a metafieldDefinitions or metaobjectDefinitions query. The shape is detected for you.
 
 {
   "data": {
-    "metafieldDefinitions": {
+    "metaobjectDefinitions": {
       "edges": [ { "node": { ... } } ]
     }
   }
@@ -151,7 +166,8 @@
 
     <div id="chips" class="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto border-t border-linesoft bg-bg px-4 py-2.5 empty:hidden"></div>
 
-    <div class="flex flex-wrap items-center gap-x-5 gap-y-3.5 border-t border-linesoft bg-panel px-4 py-3">
+    <!-- metafield controls -->
+    <div id="ctlMetafield" class="flex flex-wrap items-center gap-x-5 gap-y-3.5 border-t border-linesoft bg-panel px-4 py-3">
       <div class="flex items-center gap-[7px]">
         <label for="owner" class="lbl">Owner type</label>
         <select id="owner" class="field">
@@ -183,6 +199,43 @@
         <input type="checkbox" id="pin" class="h-3.5 w-3.5 cursor-pointer accent-signal">
         <span class="text-xs text-dim">Pin definitions</span>
       </label>
+    </div>
+
+    <!-- metaobject controls -->
+    <div id="ctlMetaobject" class="hidden flex-wrap items-center gap-x-5 gap-y-3.5 border-t border-linesoft bg-panel px-4 py-3">
+      <div class="flex items-center gap-[7px]">
+        <label for="moAdmin" class="lbl">Admin access</label>
+        <select id="moAdmin" class="field">
+          <option value="__auto">Auto (from data)</option>
+          <option>PUBLIC_READ_WRITE</option>
+          <option>PUBLIC_READ</option>
+          <option>MERCHANT_READ_WRITE</option>
+          <option>MERCHANT_READ</option>
+          <option>PRIVATE</option>
+          <option value="__omit">Omit field</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-[7px]">
+        <label for="moStorefront" class="lbl">Storefront access</label>
+        <select id="moStorefront" class="field">
+          <option value="__auto">Auto (from data)</option>
+          <option value="PUBLIC_READ">Force PUBLIC_READ</option>
+          <option value="NONE">Force NONE</option>
+          <option value="__omit">Omit field</option>
+        </select>
+      </div>
+      <label class="flex cursor-pointer items-center gap-1.5">
+        <input type="checkbox" id="caps" checked class="h-3.5 w-3.5 cursor-pointer accent-signal">
+        <span class="text-xs text-dim">Keep capabilities</span>
+      </label>
+      <label class="flex cursor-pointer items-center gap-1.5">
+        <input type="checkbox" id="dnk" checked class="h-3.5 w-3.5 cursor-pointer accent-signal">
+        <span class="text-xs text-dim">Keep display name key</span>
+      </label>
+    </div>
+
+    <!-- shared controls -->
+    <div class="flex flex-wrap items-center gap-x-5 gap-y-3.5 border-t border-linesoft bg-panel px-4 py-3">
       <label class="flex cursor-pointer items-center gap-1.5">
         <input type="checkbox" id="desc" checked class="h-3.5 w-3.5 cursor-pointer accent-signal">
         <span class="text-xs text-dim">Keep descriptions</span>
@@ -191,6 +244,7 @@
         <input type="checkbox" id="valid" checked class="h-3.5 w-3.5 cursor-pointer accent-signal">
         <span class="text-xs text-dim">Keep validations</span>
       </label>
+      <span id="modeHint" class="font-mono text-[11px] text-faint"></span>
     </div>
 
     <details class="border-t border-linesoft bg-panel">
@@ -198,23 +252,12 @@
         Step 1 — the read query to run first
       </summary>
       <div class="relative px-4 pb-3.5">
-        <button id="copyQuery" class="btn absolute right-6 top-1.5">Copy</button>
-        <pre id="readQuery" class="overflow-x-auto rounded border border-line bg-bg p-3 font-mono text-[11.5px] leading-[1.65]">{
-  metafieldDefinitions(first: 250, ownerType: PRODUCT) {
-    edges {
-      node {
-        name
-        namespace
-        key
-        description
-        type { name }
-        ownerType
-        validations { name value }
-        access { storefront }
-      }
-    }
-  }
-}</pre>
+        <div class="mb-2 flex items-center gap-4">
+          <button id="tabMf" class="tab tab-on" type="button">metafields</button>
+          <button id="tabMo" class="tab" type="button">metaobjects</button>
+          <button id="copyQuery" class="btn ml-auto">Copy</button>
+        </div>
+        <pre id="readQuery" class="overflow-x-auto rounded border border-line bg-bg p-3 font-mono text-[11.5px] leading-[1.65]"></pre>
       </div>
     </details>
   </section>
@@ -248,79 +291,155 @@
       outWrap = $('outWrap'),
       copyBtn = $('copyBtn'),
       inCount = $('inCount'),
-      outCount= $('outCount');
+      outCount= $('outCount'),
+      modeBadge = $('modeBadge'),
+      modeHint  = $('modeHint');
 
   var EMPTY_STATE = '<div class="px-5 py-10 text-center text-[13px] text-faint">' +
                     '<p class="mb-1">Nothing to build yet.</p>' +
                     '<p class="font-mono text-[11.5px] text-signaldn">Paste a query response on the left.</p></div>';
 
   var REFERENCE_TYPES = ['file_reference','product_reference','variant_reference',
-    'collection_reference','page_reference','metaobject_reference','customer_reference',
-    'company_reference','order_reference'];
+    'collection_reference','page_reference','metaobject_reference','mixed_reference',
+    'customer_reference','company_reference','order_reference'];
 
-  // Reads the type name off a node, tolerating both { type: { name } } and { type }.
-  function typeOf(n){
-    return n && n.type && n.type.name ? n.type.name : String(n && n.type || '');
-  }
+  /* ---------- 0. read queries ---------- */
 
-  // Catches list.product_reference as well as product_reference.
-  function isReference(t){
-    return REFERENCE_TYPES.indexOf(String(t).replace(/^list\./, '')) !== -1;
-  }
+  var QUERY = {
+    metafield: '{\n' +
+'  metafieldDefinitions(first: 250, ownerType: PRODUCT) {\n' +
+'    edges {\n' +
+'      node {\n' +
+'        id\n' +
+'        name\n' +
+'        namespace\n' +
+'        key\n' +
+'        description\n' +
+'        type { name }\n' +
+'        ownerType\n' +
+'        validations { name value }\n' +
+'        access { storefront }\n' +
+'        pinnedPosition\n' +
+'      }\n' +
+'    }\n' +
+'    pageInfo { hasNextPage endCursor }\n' +
+'  }\n' +
+'}',
+    metaobject: '{\n' +
+'  metaobjectDefinitions(first: 250) {\n' +
+'    edges {\n' +
+'      node {\n' +
+'        id\n' +
+'        name\n' +
+'        type\n' +
+'        description\n' +
+'        displayNameKey\n' +
+'        access { admin storefront }\n' +
+'        capabilities {\n' +
+'          publishable { enabled }\n' +
+'          translatable { enabled }\n' +
+'          renderable { enabled data { metaTitleKey metaDescriptionKey } }\n' +
+'          onlineStore { enabled data { urlHandle } }\n' +
+'        }\n' +
+'        fieldDefinitions {\n' +
+'          key\n' +
+'          name\n' +
+'          description\n' +
+'          required\n' +
+'          type { name }\n' +
+'          validations { name value }\n' +
+'        }\n' +
+'      }\n' +
+'    }\n' +
+'    pageInfo { hasNextPage endCursor }\n' +
+'  }\n' +
+'}'
+  };
 
-  // Invented data — a fictional storefront, purely to demo the tool.
+  /* ---------- 0b. samples ---------- */
+
   var SAMPLE = {
-    data: { metafieldDefinitions: { edges: [
-      { node: { name:"Shelf height", namespace:"demo", key:"shelf_height",
-                description:"Height of the assembled shelf",
-                type:{name:"dimension"}, ownerType:"PRODUCT",
-                validations:[], access:{storefront:"PUBLIC_READ"} } },
-
-      { node: { name:"Assembly time", namespace:"demo", key:"assembly_time",
-                description:"Rough build time in minutes",
-                type:{name:"number_integer"}, ownerType:"PRODUCT",
-                validations:[{name:"min", value:"1"}, {name:"max", value:"240"}],
-                access:{storefront:"PUBLIC_READ"} } },
-
-      { node: { name:"Wood finish", namespace:"demo", key:"wood_finish",
-                description:"",
-                type:{name:"single_line_text_field"}, ownerType:"PRODUCT",
-                validations:[{name:"choices", value:"[\"Oak\",\"Walnut\",\"Ash\"]"}],
-                access:{storefront:"PUBLIC_READ"} } },
-
-      { node: { name:"Care guide", namespace:"demo", key:"care_guide",
-                description:"Long-form care and cleaning notes",
-                type:{name:"rich_text_field"}, ownerType:"PRODUCT",
-                validations:[], access:{storefront:"PUBLIC_READ"} } },
-
-      { node: { name:"Assembly video", namespace:"demo", key:"assembly_video",
-                description:"",
-                type:{name:"file_reference"}, ownerType:"PRODUCT",
-                validations:[{name:"file_type_options", value:"[\"Video\"]"}],
-                access:{storefront:"PUBLIC_READ"} } },
-
-      { node: { name:"Pairs well with", namespace:"demo", key:"pairs_with",
-                description:"Related products shown on the product page",
-                type:{name:"list.product_reference"}, ownerType:"PRODUCT",
-                validations:[], access:{storefront:"PUBLIC_READ"} } },
-
-      { node: { name:"Internal SKU note", namespace:"demo", key:"sku_note",
-                description:"Warehouse-only note, hidden from the storefront",
-                type:{name:"multi_line_text_field"}, ownerType:"PRODUCT",
-                validations:[], access:{storefront:"NONE"} } }
-    ]}}
+    metafield: {
+      data: { metafieldDefinitions: { edges: [
+        { node: { id:"gid://shopify/MetafieldDefinition/1000000001",
+                  name:"Fabric care", namespace:"custom", key:"fabric_care",
+                  description:"Washing instructions shown under the buy button",
+                  type:{name:"single_line_text_field"}, ownerType:"PRODUCT",
+                  validations:[], access:{storefront:"PUBLIC_READ"}, pinnedPosition:1 } },
+        { node: { id:"gid://shopify/MetafieldDefinition/1000000002",
+                  name:"Launch date", namespace:"custom", key:"launch_date", description:"",
+                  type:{name:"date"}, ownerType:"PRODUCT",
+                  validations:[], access:{storefront:"PUBLIC_READ"}, pinnedPosition:null } },
+        { node: { id:"gid://shopify/MetafieldDefinition/1000000003",
+                  name:"Spec sheet", namespace:"custom", key:"spec_sheet",
+                  description:"PDF or image of the full specification",
+                  type:{name:"file_reference"}, ownerType:"PRODUCT",
+                  validations:[{name:"file_type_options", value:"[\"Image\"]"}],
+                  access:{storefront:"PUBLIC_READ"}, pinnedPosition:null } },
+        { node: { id:"gid://shopify/MetafieldDefinition/1000000004",
+                  name:"Box weight", namespace:"shipping", key:"box_weight", description:"",
+                  type:{name:"weight"}, ownerType:"PRODUCT",
+                  validations:[], access:{storefront:"NONE"}, pinnedPosition:null } }
+      ]}}
+    },
+    metaobject: {
+      data: { metaobjectDefinitions: { edges: [
+        { node: {
+            id:"gid://shopify/MetaobjectDefinition/2000000001",
+            name:"Team member", type:"team_member",
+            description:"A person shown on the about page",
+            displayNameKey:"full_name",
+            access:{ admin:"PUBLIC_READ_WRITE", storefront:"PUBLIC_READ" },
+            capabilities:{ publishable:{enabled:false}, translatable:{enabled:true},
+                           renderable:{enabled:false,data:null}, onlineStore:{enabled:false,data:null} },
+            fieldDefinitions:[
+              { key:"full_name", name:"Full name", description:null, required:true,
+                type:{name:"single_line_text_field"}, validations:[] },
+              { key:"headshot", name:"Headshot", description:null, required:false,
+                type:{name:"file_reference"}, validations:[{name:"file_type_options",value:"[\"Image\"]"}] },
+              { key:"bio", name:"Bio", description:"Two or three sentences", required:false,
+                type:{name:"rich_text_field"}, validations:[] },
+              { key:"is_active", name:"Currently on the team", description:null, required:true,
+                type:{name:"boolean"}, validations:[] }
+            ]
+        }},
+        { node: {
+            id:"gid://shopify/MetaobjectDefinition/2000000002",
+            name:"FAQ entry", type:"faq_entry",
+            description:"One question and answer pair",
+            displayNameKey:"question",
+            access:{ admin:"PUBLIC_READ_WRITE", storefront:"PUBLIC_READ" },
+            capabilities:{ publishable:{enabled:false}, translatable:{enabled:false},
+                           renderable:{enabled:false,data:null}, onlineStore:{enabled:false,data:null} },
+            fieldDefinitions:[
+              { key:"question", name:"Question", description:null, required:true,
+                type:{name:"single_line_text_field"}, validations:[] },
+              { key:"answer", name:"Answer", description:null, required:true,
+                type:{name:"rich_text_field"}, validations:[] },
+              { key:"topics", name:"Topics", description:null, required:false,
+                type:{name:"list.single_line_text_field"}, validations:[] },
+              { key:"helpfulness", name:"Helpfulness", description:null, required:false,
+                type:{name:"rating"}, validations:[{name:"scale_min",value:"1.0"},{name:"scale_max",value:"5.0"}] }
+            ]
+        }}
+      ]}}
+    }
   };
 
   /* ---------- 1. helpers ---------- */
 
-  function alias(ns, key){
-    return (ns + '_' + key).replace(/[^a-zA-Z0-9_]/g,'_').replace(/^(\d)/,'_$1');
+  function safeAlias(s){
+    return String(s).replace(/[^a-zA-Z0-9_]/g,'_').replace(/^(\d)/,'_$1');
   }
 
   function esc(s){
-    return s.replace(/[&<>]/g, function(c){
+    return String(s).replace(/[&<>]/g, function(c){
       return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];
     });
+  }
+
+  function typeOf(n){
+    return n && n.type && n.type.name ? n.type.name : (typeof n.type === 'string' ? n.type : '');
   }
 
   function highlight(code){
@@ -340,62 +459,91 @@
     return out;
   }
 
-  /* ---------- 2. parse input (full response, inner object, or bare array) ---------- */
+  /* ---------- 2. parse input, detect which definition kind it is ---------- */
 
-  function extractNodes(raw){
-    var obj;
-    try{
-      obj = JSON.parse(raw);
-    }catch(e){
+  function parseLoose(raw){
+    try{ return JSON.parse(raw); }
+    catch(e){
       var a = raw.indexOf('{'), b = raw.lastIndexOf('}');
       if(a === -1 || b <= a) throw new Error('That is not valid JSON. Paste the whole response object from GraphiQL.');
-      try{ obj = JSON.parse(raw.slice(a, b+1)); }
+      try{ return JSON.parse(raw.slice(a, b+1)); }
       catch(e2){ throw new Error('That is not valid JSON — check for a missing comma or bracket.'); }
     }
-    var md = (obj && obj.data && obj.data.metafieldDefinitions) || (obj && obj.metafieldDefinitions) || obj;
-    var list = null;
-    if(md){
-      if(Array.isArray(md))            list = md;
-      else if(Array.isArray(md.edges)) list = md.edges;
-      else if(Array.isArray(md.nodes)) list = md.nodes;
-    }
-    if(!list) throw new Error('No metafieldDefinitions found. Expected a response containing edges or nodes.');
-    var nodes = list.map(function(e){ return e && e.node ? e.node : e; })
-                    .filter(function(n){ return n && n.namespace && n.key; });
-    if(!nodes.length) throw new Error('Found the list, but no definitions with a namespace and key in it.');
-    return nodes;
   }
 
-  /* ---------- 3. build the mutation ---------- */
+  function listFrom(md){
+    if(!md) return null;
+    if(Array.isArray(md))            return md;
+    if(Array.isArray(md.edges))      return md.edges;
+    if(Array.isArray(md.nodes))      return md.nodes;
+    return null;
+  }
 
-  function buildMutation(nodes, opt){
+  function unwrap(list){
+    return list.map(function(e){ return e && e.node ? e.node : e; })
+               .filter(function(n){ return n && typeof n === 'object'; });
+  }
+
+  function extractPayload(raw){
+    var obj = parseLoose(raw);
+    var d   = (obj && obj.data) ? obj.data : obj;
+
+    var moList = listFrom(d && d.metaobjectDefinitions) || listFrom(obj && obj.metaobjectDefinitions);
+    if(moList){
+      var mo = unwrap(moList).filter(function(n){ return typeof n.type === 'string' && n.type; });
+      if(!mo.length) throw new Error('Found metaobjectDefinitions, but no nodes with a type in them. Add type to your read query.');
+      return { mode:'metaobject', nodes: mo };
+    }
+
+    var mfList = listFrom(d && d.metafieldDefinitions) || listFrom(obj && obj.metafieldDefinitions);
+    if(mfList){
+      var mf = unwrap(mfList).filter(function(n){ return n.namespace && n.key; });
+      if(!mf.length) throw new Error('Found metafieldDefinitions, but no nodes with a namespace and key in them.');
+      return { mode:'metafield', nodes: mf };
+    }
+
+    // bare list — sniff the shape
+    var bare = listFrom(d) || listFrom(obj);
+    if(bare){
+      var nodes = unwrap(bare);
+      var looksMo = nodes.filter(function(n){
+        return n.fieldDefinitions || (typeof n.type === 'string' && !n.namespace);
+      });
+      if(looksMo.length) return { mode:'metaobject', nodes: looksMo };
+      var looksMf = nodes.filter(function(n){ return n.namespace && n.key; });
+      if(looksMf.length) return { mode:'metafield', nodes: looksMf };
+    }
+
+    throw new Error('No metafieldDefinitions or metaobjectDefinitions in there. Paste the full GraphiQL response — the object with data.metafieldDefinitions or data.metaobjectDefinitions in it.');
+  }
+
+  /* ---------- 3a. build: metafield mutation ---------- */
+
+  function buildMetafield(nodes, opt){
     var blocks = nodes.map(function(d){
-      var typeName = typeOf(d);
       var owner = opt.owner === '__auto' ? (d.ownerType || 'PRODUCT') : opt.owner;
 
       var descLine = '';
-      if(opt.desc && d.description){
-        descLine = '\n    description: ' + JSON.stringify(d.description);
-      }
+      if(opt.desc && d.description) descLine = '\n    description: ' + JSON.stringify(d.description);
 
       var validLine = '';
       if(opt.valid && d.validations && d.validations.length){
         validLine = '\n    validations: [' + d.validations.map(function(v){
-          return '{ name: "' + v.name + '", value: ' + JSON.stringify(v.value) + ' }';
+          return '{ name: ' + JSON.stringify(v.name) + ', value: ' + JSON.stringify(v.value) + ' }';
         }).join(', ') + ']';
       }
 
       var accessLine = '', sf = null;
-      if(opt.access === '__auto')      sf = d.access && d.access.storefront ? d.access.storefront : null;
+      if(opt.access === '__auto')      sf = (d.access && d.access.storefront) || null;
       else if(opt.access !== '__omit') sf = opt.access;
       if(sf) accessLine = '\n    access: { storefront: ' + sf + ' }';
 
-      return '  ' + alias(d.namespace, d.key) + ': metafieldDefinitionCreate(definition: {' +
+      return '  ' + safeAlias(d.namespace + '_' + d.key) + ': metafieldDefinitionCreate(definition: {' +
         '\n    name: ' + JSON.stringify(d.name || d.key) +
         '\n    namespace: ' + JSON.stringify(d.namespace) +
         '\n    key: ' + JSON.stringify(d.key) +
         descLine +
-        '\n    type: ' + JSON.stringify(typeName) +
+        '\n    type: ' + JSON.stringify(typeOf(d)) +
         '\n    ownerType: ' + owner +
         '\n    pin: ' + (opt.pin ? 'true' : 'false') +
         validLine + accessLine +
@@ -404,14 +552,112 @@
     return 'mutation CopyMetafieldDefinitions {\n' + blocks.join('\n\n') + '\n}';
   }
 
+  /* ---------- 3b. build: metaobject mutation ---------- */
+
+  function capsBlock(caps){
+    if(!caps) return '';
+    var lines = [];
+
+    ['publishable','translatable'].forEach(function(k){
+      var c = caps[k];
+      if(c && typeof c.enabled === 'boolean') lines.push('      ' + k + ': { enabled: ' + c.enabled + ' }');
+    });
+
+    var r = caps.renderable;
+    if(r && typeof r.enabled === 'boolean'){
+      var rd = r.data || {};
+      if(r.enabled && (rd.metaTitleKey || rd.metaDescriptionKey)){
+        var p = [];
+        if(rd.metaTitleKey)       p.push('metaTitleKey: ' + JSON.stringify(rd.metaTitleKey));
+        if(rd.metaDescriptionKey) p.push('metaDescriptionKey: ' + JSON.stringify(rd.metaDescriptionKey));
+        lines.push('      renderable: { enabled: true, data: { ' + p.join(', ') + ' } }');
+      } else {
+        lines.push('      renderable: { enabled: ' + r.enabled + ' }');
+      }
+    }
+
+    var o = caps.onlineStore;
+    if(o && typeof o.enabled === 'boolean'){
+      var od = o.data || {};
+      if(o.enabled && od.urlHandle){
+        var cr = (od.createRedirects != null) ? od.createRedirects : od.canCreateRedirects;
+        var p2 = ['urlHandle: ' + JSON.stringify(od.urlHandle)];
+        if(cr != null) p2.push('createRedirects: ' + (cr ? 'true' : 'false'));
+        lines.push('      onlineStore: { enabled: true, data: { ' + p2.join(', ') + ' } }');
+      } else {
+        lines.push('      onlineStore: { enabled: ' + o.enabled + ' }');
+      }
+    }
+
+    if(!lines.length) return '';
+    return '    capabilities: {\n' + lines.join('\n') + '\n    }';
+  }
+
+  function fieldBlock(f, opt){
+    var L = [];
+    L.push('        key: ' + JSON.stringify(f.key));
+    L.push('        name: ' + JSON.stringify(f.name || f.key));
+    if(opt.desc && f.description) L.push('        description: ' + JSON.stringify(f.description));
+    if(typeof f.required === 'boolean') L.push('        required: ' + f.required);
+    L.push('        type: ' + JSON.stringify(typeOf(f)));
+    if(opt.valid && f.validations && f.validations.length){
+      L.push('        validations: [' + f.validations.map(function(v){
+        return '{ name: ' + JSON.stringify(v.name) + ', value: ' + JSON.stringify(v.value) + ' }';
+      }).join(', ') + ']');
+    }
+    return '      {\n' + L.join('\n') + '\n      }';
+  }
+
+  function buildMetaobject(nodes, opt){
+    var blocks = nodes.map(function(d){
+      var L = [];
+      L.push('    name: ' + JSON.stringify(d.name || d.type));
+      L.push('    type: ' + JSON.stringify(d.type));
+      if(opt.desc && d.description) L.push('    description: ' + JSON.stringify(d.description));
+      if(opt.dnk && d.displayNameKey) L.push('    displayNameKey: ' + JSON.stringify(d.displayNameKey));
+
+      var admin = null, sf = null;
+      if(opt.moAdmin === '__auto')      admin = (d.access && d.access.admin) || null;
+      else if(opt.moAdmin !== '__omit') admin = opt.moAdmin;
+      if(opt.moStorefront === '__auto')      sf = (d.access && d.access.storefront) || null;
+      else if(opt.moStorefront !== '__omit') sf = opt.moStorefront;
+
+      var ap = [];
+      if(admin) ap.push('admin: ' + admin);
+      if(sf)    ap.push('storefront: ' + sf);
+      if(ap.length) L.push('    access: { ' + ap.join(', ') + ' }');
+
+      if(opt.caps){
+        var cb = capsBlock(d.capabilities);
+        if(cb) L.push(cb);
+      }
+
+      var fields = (d.fieldDefinitions || []).map(function(f){ return fieldBlock(f, opt); });
+      L.push('    fieldDefinitions: [\n' + fields.join(',\n') + '\n    ]');
+
+      return '  ' + safeAlias(d.type) + ': metaobjectDefinitionCreate(definition: {\n' +
+             L.join('\n') +
+             '\n  }) {\n    metaobjectDefinition { id type name }\n    userErrors { field message code }\n  }';
+    });
+    return 'mutation CopyMetaobjectDefinitions {\n' + blocks.join('\n\n') + '\n}';
+  }
+
   /* ---------- 4. render pieces ---------- */
 
-  function renderChips(nodes){
+  function renderChips(mode, nodes){
     chips.innerHTML = nodes.map(function(d){
-      var t = typeOf(d);
-      return '<span class="chip' + (isReference(t) ? ' chip-ref' : '') + '">' +
-             '<b>' + esc(d.namespace + '.' + d.key) + '</b>' +
-             '<i>' + esc(t) + '</i></span>';
+      if(mode === 'metafield'){
+        var t = typeOf(d);
+        var isRef = REFERENCE_TYPES.indexOf(t) !== -1;
+        return '<span class="chip' + (isRef ? ' chip-ref' : '') + '">' +
+               '<b>' + esc(d.namespace + '.' + d.key) + '</b><i>' + esc(t) + '</i></span>';
+      }
+      var fd = d.fieldDefinitions || [];
+      var hasRef = fd.some(function(f){
+        return REFERENCE_TYPES.indexOf(typeOf(f).replace(/^list\./,'')) !== -1;
+      });
+      return '<span class="chip' + (hasRef ? ' chip-ref' : '') + '">' +
+             '<b>' + esc(d.type) + '</b><i>' + fd.length + ' field' + (fd.length === 1 ? '' : 's') + '</i></span>';
     }).join('');
   }
 
@@ -423,63 +669,46 @@
 
   function resetOutput(text){
     outWrap.innerHTML = text
-      ? '<div class="px-5 py-10 text-center text-[13px] text-faint"><p>' + text + '</p></div>'
+      ? '<div class="px-5 py-10 text-center text-[13px] text-faint"><p>' + esc(text) + '</p></div>'
       : EMPTY_STATE;
     copyBtn.disabled = true;
     currentMutation = '';
   }
 
-  /* ---------- 5. main render ---------- */
+  function setControls(mode){
+    $('ctlMetafield').className = (mode === 'metafield' ? 'flex' : 'hidden') +
+      ' flex-wrap items-center gap-x-5 gap-y-3.5 border-t border-linesoft bg-panel px-4 py-3';
+    $('ctlMetaobject').className = (mode === 'metaobject' ? 'flex' : 'hidden') +
+      ' flex-wrap items-center gap-x-5 gap-y-3.5 border-t border-linesoft bg-panel px-4 py-3';
+    modeHint.textContent = mode === 'metaobject'
+      ? 'descriptions & validations apply to each field definition'
+      : '';
+  }
 
-  var currentMutation = '';
-
-  function render(){
-    var raw = input.value.trim();
-
-    if(!raw){
-      msgs.innerHTML = '';
-      chips.innerHTML = '';
-      inCount.textContent = '';
-      outCount.textContent = '';
-      resetOutput(null);
+  function setBadge(mode){
+    if(!mode){
+      modeBadge.className = 'badge';
+      modeBadge.textContent = 'no data';
       return;
     }
+    modeBadge.className = 'badge badge-live';
+    modeBadge.textContent = mode === 'metaobject' ? 'metaobject' : 'metafield';
+  }
 
-    var nodes;
-    try{
-      nodes = extractNodes(raw);
-    }catch(err){
-      renderMsgs([{ type:'err', html: esc(err.message) }]);
-      chips.innerHTML = '';
-      inCount.textContent = '';
-      outCount.textContent = '';
-      resetOutput('Waiting on valid JSON.');
-      return;
-    }
+  /* ---------- 5a. notes per mode ---------- */
 
-    var opt = {
-      owner:  $('owner').value,
-      access: $('access').value,
-      pin:    $('pin').checked,
-      desc:   $('desc').checked,
-      valid:  $('valid').checked
-    };
-
-    /* --- notes worth surfacing --- */
+  function metafieldNotes(nodes, opt){
     var notes = [];
 
     if(opt.owner === '__auto' && !nodes.some(function(n){ return !!n.ownerType; })){
       notes.push({ type:'warn', html:'No <code>ownerType</code> in this response, so every definition falls back to <code>PRODUCT</code>. Add <code>ownerType</code> to your read query, or force one below.' });
     }
-
     if(opt.valid && !nodes.some(function(n){ return 'validations' in n; })){
       notes.push({ type:'warn', html:'This response has no <code>validations</code> field, so any type constraints will be dropped. Add <code>validations { name value }</code> to your read query.' });
     }
-
     if(opt.access === '__auto' && !nodes.some(function(n){ return 'access' in n; })){
       notes.push({ type:'warn', html:'No <code>access</code> field found — these will be created without storefront visibility, so Liquid cannot read them. Force <code>PUBLIC_READ</code> below if you need them in the theme.' });
     }
-
     if(opt.pin){
       var byOwner = {};
       nodes.forEach(function(n){
@@ -491,19 +720,140 @@
         notes.push({ type:'warn', html:'Pinning is on and you have more than 20 definitions for ' + esc(over.join(', ')) + '. Shopify allows 20 pinned per owner type — the extras will fail with a limit error.' });
       }
     }
-
-    var refs = nodes.filter(function(n){ return isReference(typeOf(n)); });
+    var refs = nodes.filter(function(n){ return REFERENCE_TYPES.indexOf(typeOf(n)) !== -1; });
     if(refs.length){
       notes.push({ type:'info', html:'<span>' + refs.length + ' reference-type definition' + (refs.length>1?'s':'') + ' here (highlighted in blue). The definitions copy fine, but their <em>values</em> point to IDs that only exist on the source store.</span>' });
     }
+    return notes;
+  }
 
-    renderMsgs(notes);
-    renderChips(nodes);
+  function metaobjectNotes(nodes, opt){
+    var notes = [];
+
+    var noFields = nodes.filter(function(n){ return !n.fieldDefinitions || !n.fieldDefinitions.length; });
+    if(noFields.length){
+      notes.push({ type:'warn', html:esc(noFields.length) + ' definition' + (noFields.length>1?'s have':' has') + ' no <code>fieldDefinitions</code>. A metaobject definition needs at least one field, so ' + (noFields.length>1?'those':'that one') + ' will come back as a user error. Add <code>fieldDefinitions { key name required type { name } validations { name value } }</code> to your read query.' });
+    }
+
+    if(opt.valid && !nodes.some(function(n){
+      return (n.fieldDefinitions || []).some(function(f){ return 'validations' in f; });
+    })){
+      notes.push({ type:'warn', html:'No <code>validations</code> on any field, so constraints like rating scale or file type will be dropped. Add <code>validations { name value }</code> inside <code>fieldDefinitions</code>.' });
+    }
+
+    // storefront visibility
+    var sfNone = nodes.filter(function(n){
+      var sf = opt.moStorefront === '__auto' ? (n.access && n.access.storefront) : (opt.moStorefront === '__omit' ? null : opt.moStorefront);
+      return sf === 'NONE';
+    });
+    if(sfNone.length){
+      notes.push({ type:'info', html:'<span>' + esc(sfNone.length) + ' definition' + (sfNone.length>1?'s carry':' carries') + ' <code>storefront: NONE</code>, which is Shopify\'s default. This governs <em>Storefront API</em> reads (headless and custom storefronts). If the source store renders these in Liquid today, copying <code>NONE</code> reproduces that. Force <code>PUBLIC_READ</code> only if something outside the Online Store queries them.</span>' });
+    }
+
+    // gid values inside validations
+    var gidCount = 0;
+    nodes.forEach(function(n){
+      (n.fieldDefinitions || []).forEach(function(f){
+        (f.validations || []).forEach(function(v){
+          if(v && typeof v.value === 'string' && v.value.indexOf('gid://') !== -1) gidCount++;
+        });
+      });
+    });
+    if(gidCount && opt.valid){
+      notes.push({ type:'err', html:esc(gidCount) + ' validation' + (gidCount>1?'s contain':' contains') + ' a <code>gid://</code> from the source store (a metaobject or product ID). Those IDs do not exist on the target — swap them for the new IDs after you create the referenced definitions, or the mutation errors.' });
+    }
+
+    // onlineStore enabled but no data
+    var osBad = nodes.filter(function(n){
+      var o = n.capabilities && n.capabilities.onlineStore;
+      return o && o.enabled && !(o.data && o.data.urlHandle);
+    });
+    if(osBad.length && opt.caps){
+      notes.push({ type:'warn', html:'An <code>onlineStore</code> capability is enabled but its <code>urlHandle</code> is missing from this response. Add <code>onlineStore { enabled data { urlHandle canCreateRedirects } }</code> to your read query, or the capability will be created without a handle.' });
+    }
+
+    // cross-definition references
+    var typeSet = {};
+    nodes.forEach(function(n){ typeSet[n.type] = true; });
+    var crossRef = nodes.filter(function(n){
+      return (n.fieldDefinitions || []).some(function(f){
+        return typeOf(f).indexOf('metaobject_reference') !== -1 || typeOf(f).indexOf('mixed_reference') !== -1;
+      });
+    });
+    if(crossRef.length){
+      notes.push({ type:'info', html:'<span>' + crossRef.length + ' definition' + (crossRef.length>1?'s reference':' references') + ' another metaobject. Create the referenced definition first, then run this one — order matters, and aliases in a single mutation do not run in a guaranteed order.</span>' });
+    }
+
+    var refFields = 0;
+    nodes.forEach(function(n){
+      (n.fieldDefinitions || []).forEach(function(f){
+        if(REFERENCE_TYPES.indexOf(typeOf(f).replace(/^list\./,'')) !== -1) refFields++;
+      });
+    });
+    if(refFields){
+      notes.push({ type:'info', html:'<span>' + refFields + ' reference field' + (refFields>1?'s':'') + ' across these definitions (chips in blue). The definitions copy fine, but the <em>entries</em> and the files they point at do not — those are a separate migration.</span>' });
+    }
+
+    return notes;
+  }
+
+  /* ---------- 5b. main render ---------- */
+
+  var currentMutation = '';
+  var uiMode = 'metafield';
+
+  function render(){
+    var raw = input.value.trim();
+
+    if(!raw){
+      msgs.innerHTML = '';
+      chips.innerHTML = '';
+      inCount.textContent = '';
+      outCount.textContent = '';
+      setBadge(null);
+      resetOutput(null);
+      return;
+    }
+
+    var payload;
+    try{
+      payload = extractPayload(raw);
+    }catch(err){
+      renderMsgs([{ type:'err', html: esc(err.message) }]);
+      chips.innerHTML = '';
+      inCount.textContent = '';
+      outCount.textContent = '';
+      setBadge(null);
+      resetOutput('Waiting on valid JSON.');
+      return;
+    }
+
+    var mode = payload.mode, nodes = payload.nodes;
+    if(mode !== uiMode){ uiMode = mode; setControls(mode); setTab(mode); }
+    setBadge(mode);
+
+    var opt = {
+      desc:  $('desc').checked,
+      valid: $('valid').checked,
+      // metafield
+      owner:  $('owner').value,
+      access: $('access').value,
+      pin:    $('pin').checked,
+      // metaobject
+      moAdmin:      $('moAdmin').value,
+      moStorefront: $('moStorefront').value,
+      caps:         $('caps').checked,
+      dnk:          $('dnk').checked
+    };
+
+    renderMsgs(mode === 'metafield' ? metafieldNotes(nodes, opt) : metaobjectNotes(nodes, opt));
+    renderChips(mode, nodes);
 
     inCount.textContent  = nodes.length + ' parsed';
     outCount.textContent = nodes.length + ' definition' + (nodes.length>1?'s':'');
 
-    currentMutation = buildMutation(nodes, opt);
+    currentMutation = mode === 'metafield' ? buildMetafield(nodes, opt) : buildMetaobject(nodes, opt);
+
     var pre = document.createElement('pre');
     pre.className = 'px-4 py-3.5 font-mono text-[12.5px] leading-[1.65] text-ink';
     pre.innerHTML = highlight(currentMutation);
@@ -538,15 +888,29 @@
     document.body.removeChild(ta);
   }
 
-  /* ---------- 7. wiring ---------- */
+  /* ---------- 7. step 1 tabs ---------- */
+
+  var queryTab = 'metafield';
+
+  function setTab(which){
+    queryTab = which;
+    $('tabMf').className = 'tab' + (which === 'metafield' ? ' tab-on' : '');
+    $('tabMo').className = 'tab' + (which === 'metaobject' ? ' tab-on' : '');
+    $('readQuery').textContent = QUERY[which];
+  }
+
+  /* ---------- 8. wiring ---------- */
 
   input.addEventListener('input', render);
-  ['owner','access','pin','desc','valid'].forEach(function(id){
+  ['owner','access','pin','desc','valid','moAdmin','moStorefront','caps','dnk'].forEach(function(id){
     $(id).addEventListener('change', render);
   });
 
+  $('tabMf').addEventListener('click', function(){ setTab('metafield'); });
+  $('tabMo').addEventListener('click', function(){ setTab('metaobject'); });
+
   $('sampleBtn').addEventListener('click', function(){
-    input.value = JSON.stringify(SAMPLE, null, 2);
+    input.value = JSON.stringify(SAMPLE[queryTab], null, 2);
     render();
   });
 
@@ -565,6 +929,8 @@
     copyText($('readQuery').textContent, e.currentTarget);
   });
 
+  setTab('metafield');
+  setControls('metafield');
   render();
 })();
 </script>
