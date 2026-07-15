@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metafield Definition → Mutation Builder</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg:       '#101419',
+          panel:    '#171C23',
+          panel2:   '#1D232C',
+          panel3:   '#252D38',
+          line:     '#2A323D',
+          linesoft: '#222933',
+          ink:      '#D6DDE6',
+          dim:      '#8B96A5',
+          faint:    '#5D6775',
+          signal:   '#F0B429',
+          signalup: '#FFC63D',
+          signaldn: '#7A5C14',
+          ok:       '#3FB984',
+          warn:     '#E2703A',
+          err:      '#E45C5C',
+          tokstr:   '#9FD3A8',
+          tokkw:    '#C99BF0',
+          tokenum:  '#6FB7E8',
+          tokkey:   '#E7C46B'
+        },
+        fontFamily: {
+          mono: ['ui-monospace','SFMono-Regular','SF Mono','Menlo','Consolas','Liberation Mono','monospace'],
+          sans: ['-apple-system','BlinkMacSystemFont','Segoe UI','Roboto','Helvetica','Arial','sans-serif']
+        },
+        borderRadius: { DEFAULT: '6px' }
+      }
+    }
+  }
+</script>
+
+<style type="text/tailwindcss">
+  @layer components {
+    .btn {
+      @apply rounded border border-line bg-panel2 px-2.5 py-1 text-xs text-dim transition-colors
+             hover:bg-panel3 hover:text-ink focus-visible:outline focus-visible:outline-2
+             focus-visible:outline-offset-1 focus-visible:outline-signal;
+    }
+    .btn-primary {
+      @apply border-signal bg-signal font-semibold text-[#1A1204] hover:bg-signalup hover:text-[#1A1204]
+             disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-signal;
+    }
+    .field {
+      @apply rounded border border-line bg-panel2 px-1.5 py-1 font-mono text-xs text-ink
+             focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1
+             focus-visible:outline-signal;
+    }
+    .lbl { @apply text-[11px] uppercase tracking-[0.05em] text-faint; }
+    .head { @apply text-[11px] font-semibold uppercase tracking-[0.09em] text-dim; }
+
+    /* pipeline steps */
+    .step {
+      @apply border border-linesoft bg-panel2 px-3 py-1 font-mono text-[11px]
+             uppercase tracking-[0.04em] text-faint;
+    }
+    .step-live {
+      @apply border-signaldn bg-signal/[0.07] text-signal;
+    }
+    .step-live::before { content: "▸ "; }
+
+    /* parsed chips */
+    .chip {
+      @apply inline-flex items-center overflow-hidden rounded border border-line font-mono text-[11px];
+    }
+    .chip b { @apply bg-panel2 px-[7px] py-[3px] font-normal text-ink; }
+    .chip i { @apply border-l border-line bg-panel px-[7px] py-[3px] not-italic text-faint; }
+    .chip-ref i { @apply text-tokenum; }
+
+    /* messages */
+    .msg { @apply mt-2.5 flex gap-2 rounded border px-[11px] py-2 text-xs; }
+    .msg::before { @apply font-mono font-bold; }
+    .msg-err  { @apply border-err/30 bg-err/[0.08] text-[#F4A9A9]; }
+    .msg-err::before  { content: "!"; @apply text-err; }
+    .msg-warn { @apply border-warn/30 bg-warn/[0.08] text-[#F2C09B]; }
+    .msg-warn::before { content: "!"; @apply text-warn; }
+    .msg-info { @apply border-line bg-panel2 text-dim; }
+    .msg-info::before { content: "i"; @apply text-faint; }
+    .msg code { @apply font-mono text-[11.5px] text-signal; }
+
+    /* syntax tokens */
+    .s    { @apply text-tokstr; }
+    .kw   { @apply text-tokkw; }
+    .bool { @apply text-tokenum; }
+    .enum { @apply text-tokenum; }
+    .key  { @apply text-tokkey; }
+  }
+
+  /* things utilities can't reach */
+  summary::-webkit-details-marker { display: none; }
+  summary { list-style: none; }
+  summary::before { content: "+"; font-family: theme('fontFamily.mono'); color: theme('colors.signal'); }
+  details[open] summary::before { content: "–"; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+
+<body class="flex h-full min-h-screen flex-col bg-bg font-sans text-sm text-ink antialiased">
+
+<header class="flex flex-wrap items-center gap-5 border-b border-line bg-panel px-5 py-3.5">
+  <div class="flex items-baseline gap-2.5">
+    <h1 class="text-[15px] font-semibold -tracking-[0.01em]">Metafield Definition Builder</h1>
+    <span class="font-mono text-[11px] text-faint">shopify admin api</span>
+  </div>
+  <div class="flex flex-wrap items-center md:ml-auto" aria-label="Workflow position">
+    <div class="step rounded-l">1 · read in graphiql</div>
+    <div class="step step-live border-l-0">2 · transform here</div>
+    <div class="step rounded-r border-l-0">3 · run mutation</div>
+  </div>
+</header>
+
+<main class="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line md:grid-cols-2">
+
+  <!-- ============ INPUT ============ -->
+  <section class="flex min-h-[60vh] min-w-0 flex-col bg-bg md:min-h-0">
+    <div class="flex min-h-[44px] items-center gap-2.5 border-b border-linesoft bg-panel px-4 py-2.5">
+      <h2 class="head">Query response</h2>
+      <span id="inCount" class="font-mono text-[11px] text-faint"></span>
+      <div class="ml-auto flex gap-1.5">
+        <button id="sampleBtn" class="btn">Load sample</button>
+        <button id="clearBtn" class="btn">Clear</button>
+      </div>
+    </div>
+
+    <textarea id="input" spellcheck="false"
+      class="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3.5 font-mono
+             text-[12.5px] leading-[1.65] text-ink placeholder:text-faint focus:outline-none"
+      placeholder='Paste the JSON response from your metafieldDefinitions query.
+
+{
+  "data": {
+    "metafieldDefinitions": {
+      "edges": [ { "node": { ... } } ]
+    }
+  }
+}'></textarea>
+
+    <div id="msgs" class="px-4"></div>
+
+    <div id="chips" class="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto border-t border-linesoft bg-bg px-4 py-2.5 empty:hidden"></div>
+
+    <div class="flex flex-wrap items-center gap-x-5 gap-y-3.5 border-t border-linesoft bg-panel px-4 py-3">
+      <div class="flex items-center gap-[7px]">
+        <label for="owner" class="lbl">Owner type</label>
+        <select id="owner" class="field">
+          <option value="__auto">Auto (from data)</option>
+          <option>PRODUCT</option>
+          <option>PRODUCTVARIANT</option>
+          <option>COLLECTION</option>
+          <option>CUSTOMER</option>
+          <option>ORDER</option>
+          <option>COMPANY</option>
+          <option>PAGE</option>
+          <option>BLOG</option>
+          <option>ARTICLE</option>
+          <option>SHOP</option>
+          <option>LOCATION</option>
+          <option>MARKET</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-[7px]">
+        <label for="access" class="lbl">Storefront access</label>
+        <select id="access" class="field">
+          <option value="__auto">Auto (from data)</option>
+          <option value="PUBLIC_READ">Force PUBLIC_READ</option>
+          <option value="NONE">Force NONE</option>
+          <option value="__omit">Omit field</option>
+        </select>
+      </div>
+      <label class="flex cursor-pointer items-center gap-1.5">
+        <input type="checkbox" id="pin" class="h-3.5 w-3.5 cursor-pointer accent-signal">
+        <span class="text-xs text-dim">Pin definitions</span>
+      </label>
+      <label class="flex cursor-pointer items-center gap-1.5">
+        <input type="checkbox" id="desc" checked class="h-3.5 w-3.5 cursor-pointer accent-signal">
+        <span class="text-xs text-dim">Keep descriptions</span>
+      </label>
+      <label class="flex cursor-pointer items-center gap-1.5">
+        <input type="checkbox" id="valid" checked class="h-3.5 w-3.5 cursor-pointer accent-signal">
+        <span class="text-xs text-dim">Keep validations</span>
+      </label>
+    </div>
+
+    <details class="border-t border-linesoft bg-panel">
+      <summary class="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-[11px] uppercase tracking-[0.07em] text-dim hover:text-ink">
+        Step 1 — the read query to run first
+      </summary>
+      <div class="relative px-4 pb-3.5">
+        <button id="copyQuery" class="btn absolute right-6 top-1.5">Copy</button>
+        <pre id="readQuery" class="overflow-x-auto rounded border border-line bg-bg p-3 font-mono text-[11.5px] leading-[1.65]">{
+  metafieldDefinitions(first: 250, ownerType: PRODUCT) {
+    edges {
+      node {
+        name
+        namespace
+        key
+        description
+        type { name }
+        ownerType
+        validations { name value }
+        access { storefront }
+      }
+    }
+  }
+}</pre>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ OUTPUT ============ -->
+  <section class="flex min-h-[60vh] min-w-0 flex-col bg-bg md:min-h-0">
+    <div class="flex min-h-[44px] items-center gap-2.5 border-b border-linesoft bg-panel px-4 py-2.5">
+      <h2 class="head">Create mutation</h2>
+      <span id="outCount" class="font-mono text-[11px] text-faint"></span>
+      <div class="ml-auto flex gap-1.5">
+        <button id="copyBtn" class="btn btn-primary" disabled>Copy mutation</button>
+      </div>
+    </div>
+    <div id="outWrap" class="min-h-0 flex-1 overflow-auto">
+      <div class="px-5 py-10 text-center text-[13px] text-faint">
+        <p class="mb-1">Nothing to build yet.</p>
+        <p class="font-mono text-[11.5px] text-signaldn">Paste a query response on the left.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+
+  var input   = $('input'),
+      msgs    = $('msgs'),
+      chips   = $('chips'),
+      outWrap = $('outWrap'),
+      copyBtn = $('copyBtn'),
+      inCount = $('inCount'),
+      outCount= $('outCount');
+
+  var EMPTY_STATE = '<div class="px-5 py-10 text-center text-[13px] text-faint">' +
+                    '<p class="mb-1">Nothing to build yet.</p>' +
+                    '<p class="font-mono text-[11.5px] text-signaldn">Paste a query response on the left.</p></div>';
+
+  var REFERENCE_TYPES = ['file_reference','product_reference','variant_reference',
+    'collection_reference','page_reference','metaobject_reference','customer_reference',
+    'company_reference','order_reference'];
+
+  var SAMPLE = {
+    data: { metafieldDefinitions: { edges: [
+      { node: { name:"Snowboard length", namespace:"test_data", key:"snowboard_length",
+                description:"The length of the snowboard", type:{name:"dimension"},
+                ownerType:"PRODUCT", validations:[], access:{storefront:"PUBLIC_READ"} } },
+      { node: { name:"Snowboard binding mount", namespace:"test_data", key:"binding_mount",
+                description:"The type of binding mount used on the snowboard",
+                type:{name:"single_line_text_field"}, ownerType:"PRODUCT",
+                validations:[], access:{storefront:"PUBLIC_READ"} } },
+      { node: { name:"title", namespace:"custom", key:"title", description:"",
+                type:{name:"single_line_text_field"}, ownerType:"PRODUCT",
+                validations:[], access:{storefront:"PUBLIC_READ"} } },
+      { node: { name:"video", namespace:"custom", key:"video", description:"",
+                type:{name:"file_reference"}, ownerType:"PRODUCT",
+                validations:[{name:"file_type_options", value:"[\"Video\"]"}],
+                access:{storefront:"PUBLIC_READ"} } }
+    ]}}
+  };
+
+  /* ---------- 1. helpers ---------- */
+
+  function alias(ns, key){
+    return (ns + '_' + key).replace(/[^a-zA-Z0-9_]/g,'_').replace(/^(\d)/,'_$1');
+  }
+
+  function esc(s){
+    return s.replace(/[&<>]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];
+    });
+  }
+
+  function highlight(code){
+    var re = /("(?:[^"\\]|\\.)*")|(\bmutation\b)|(\b(?:true|false)\b)|(\b[A-Z][A-Z_0-9]{2,}\b)|([A-Za-z_][A-Za-z_0-9]*)(?=\s*:)/g;
+    var out='', last=0, m;
+    while((m = re.exec(code)) !== null){
+      out += esc(code.slice(last, m.index));
+      var t = esc(m[0]);
+      if(m[1])      out += '<span class="s">'+t+'</span>';
+      else if(m[2]) out += '<span class="kw">'+t+'</span>';
+      else if(m[3]) out += '<span class="bool">'+t+'</span>';
+      else if(m[4]) out += '<span class="enum">'+t+'</span>';
+      else          out += '<span class="key">'+t+'</span>';
+      last = m.index + m[0].length;
+    }
+    out += esc(code.slice(last));
+    return out;
+  }
+
+  /* ---------- 2. parse input (full response, inner object, or bare array) ---------- */
+
+  function extractNodes(raw){
+    var obj;
+    try{
+      obj = JSON.parse(raw);
+    }catch(e){
+      var a = raw.indexOf('{'), b = raw.lastIndexOf('}');
+      if(a === -1 || b <= a) throw new Error('That is not valid JSON. Paste the whole response object from GraphiQL.');
+      try{ obj = JSON.parse(raw.slice(a, b+1)); }
+      catch(e2){ throw new Error('That is not valid JSON — check for a missing comma or bracket.'); }
+    }
+    var md = (obj && obj.data && obj.data.metafieldDefinitions) || (obj && obj.metafieldDefinitions) || obj;
+    var list = null;
+    if(md){
+      if(Array.isArray(md))            list = md;
+      else if(Array.isArray(md.edges)) list = md.edges;
+      else if(Array.isArray(md.nodes)) list = md.nodes;
+    }
+    if(!list) throw new Error('No metafieldDefinitions found. Expected a response containing edges or nodes.');
+    var nodes = list.map(function(e){ return e && e.node ? e.node : e; })
+                    .filter(function(n){ return n && n.namespace && n.key; });
+    if(!nodes.length) throw new Error('Found the list, but no definitions with a namespace and key in it.');
+    return nodes;
+  }
+
+  /* ---------- 3. build the mutation ---------- */
+
+  function buildMutation(nodes, opt){
+    var blocks = nodes.map(function(d){
+      var typeName = d.type && d.type.name ? d.type.name : d.type;
+      var owner = opt.owner === '__auto' ? (d.ownerType || 'PRODUCT') : opt.owner;
+
+      var descLine = '';
+      if(opt.desc && d.description){
+        descLine = '\n    description: ' + JSON.stringify(d.description);
+      }
+
+      var validLine = '';
+      if(opt.valid && d.validations && d.validations.length){
+        validLine = '\n    validations: [' + d.validations.map(function(v){
+          return '{ name: "' + v.name + '", value: ' + JSON.stringify(v.value) + ' }';
+        }).join(', ') + ']';
+      }
+
+      var accessLine = '', sf = null;
+      if(opt.access === '__auto')      sf = d.access && d.access.storefront ? d.access.storefront : null;
+      else if(opt.access !== '__omit') sf = opt.access;
+      if(sf) accessLine = '\n    access: { storefront: ' + sf + ' }';
+
+      return '  ' + alias(d.namespace, d.key) + ': metafieldDefinitionCreate(definition: {' +
+        '\n    name: ' + JSON.stringify(d.name || d.key) +
+        '\n    namespace: ' + JSON.stringify(d.namespace) +
+        '\n    key: ' + JSON.stringify(d.key) +
+        descLine +
+        '\n    type: ' + JSON.stringify(typeName) +
+        '\n    ownerType: ' + owner +
+        '\n    pin: ' + (opt.pin ? 'true' : 'false') +
+        validLine + accessLine +
+        '\n  }) {\n    createdDefinition { id name key }\n    userErrors { field message code }\n  }';
+    });
+    return 'mutation CopyMetafieldDefinitions {\n' + blocks.join('\n\n') + '\n}';
+  }
+
+  /* ---------- 4. render pieces ---------- */
+
+  function renderChips(nodes){
+    chips.innerHTML = nodes.map(function(d){
+      var t = d.type && d.type.name ? d.type.name : String(d.type);
+      var isRef = REFERENCE_TYPES.indexOf(t) !== -1;
+      return '<span class="chip' + (isRef ? ' chip-ref' : '') + '">' +
+             '<b>' + esc(d.namespace + '.' + d.key) + '</b>' +
+             '<i>' + esc(t) + '</i></span>';
+    }).join('');
+  }
+
+  function renderMsgs(list){
+    msgs.innerHTML = list.map(function(m){
+      return '<div class="msg msg-' + m.type + '">' + m.html + '</div>';
+    }).join('');
+  }
+
+  function resetOutput(text){
+    outWrap.innerHTML = text
+      ? '<div class="px-5 py-10 text-center text-[13px] text-faint"><p>' + text + '</p></div>'
+      : EMPTY_STATE;
+    copyBtn.disabled = true;
+    currentMutation = '';
+  }
+
+  /* ---------- 5. main render ---------- */
+
+  var currentMutation = '';
+
+  function render(){
+    var raw = input.value.trim();
+
+    if(!raw){
+      msgs.innerHTML = '';
+      chips.innerHTML = '';
+      inCount.textContent = '';
+      outCount.textContent = '';
+      resetOutput(null);
+      return;
+    }
+
+    var nodes;
+    try{
+      nodes = extractNodes(raw);
+    }catch(err){
+      renderMsgs([{ type:'err', html: esc(err.message) }]);
+      chips.innerHTML = '';
+      inCount.textContent = '';
+      outCount.textContent = '';
+      resetOutput('Waiting on valid JSON.');
+      return;
+    }
+
+    var opt = {
+      owner:  $('owner').value,
+      access: $('access').value,
+      pin:    $('pin').checked,
+      desc:   $('desc').checked,
+      valid:  $('valid').checked
+    };
+
+    /* --- notes worth surfacing --- */
+    var notes = [];
+
+    if(opt.owner === '__auto' && !nodes.some(function(n){ return !!n.ownerType; })){
+      notes.push({ type:'warn', html:'No <code>ownerType</code> in this response, so every definition falls back to <code>PRODUCT</code>. Add <code>ownerType</code> to your read query, or force one below.' });
+    }
+
+    if(opt.valid && !nodes.some(function(n){ return 'validations' in n; })){
+      notes.push({ type:'warn', html:'This response has no <code>validations</code> field, so any type constraints will be dropped. Add <code>validations { name value }</code> to your read query.' });
+    }
+
+    if(opt.access === '__auto' && !nodes.some(function(n){ return 'access' in n; })){
+      notes.push({ type:'warn', html:'No <code>access</code> field found — these will be created without storefront visibility, so Liquid cannot read them. Force <code>PUBLIC_READ</code> below if you need them in the theme.' });
+    }
+
+    if(opt.pin){
+      var byOwner = {};
+      nodes.forEach(function(n){
+        var o = opt.owner === '__auto' ? (n.ownerType || 'PRODUCT') : opt.owner;
+        byOwner[o] = (byOwner[o] || 0) + 1;
+      });
+      var over = Object.keys(byOwner).filter(function(o){ return byOwner[o] > 20; });
+      if(over.length){
+        notes.push({ type:'warn', html:'Pinning is on and you have more than 20 definitions for ' + esc(over.join(', ')) + '. Shopify allows 20 pinned per owner type — the extras will fail with a limit error.' });
+      }
+    }
+
+    var refs = nodes.filter(function(n){
+      var t = n.type && n.type.name ? n.type.name : n.type;
+      return REFERENCE_TYPES.indexOf(t) !== -1;
+    });
+    if(refs.length){
+      notes.push({ type:'info', html:'<span>' + refs.length + ' reference-type definition' + (refs.length>1?'s':'') + ' here (highlighted in blue). The definitions copy fine, but their <em>values</em> point to IDs that only exist on the source store.</span>' });
+    }
+
+    renderMsgs(notes);
+    renderChips(nodes);
+
+    inCount.textContent  = nodes.length + ' parsed';
+    outCount.textContent = nodes.length + ' definition' + (nodes.length>1?'s':'');
+
+    currentMutation = buildMutation(nodes, opt);
+    var pre = document.createElement('pre');
+    pre.className = 'px-4 py-3.5 font-mono text-[12.5px] leading-[1.65] text-ink';
+    pre.innerHTML = highlight(currentMutation);
+    outWrap.innerHTML = '';
+    outWrap.appendChild(pre);
+    copyBtn.disabled = false;
+  }
+
+  /* ---------- 6. copy ---------- */
+
+  function copyText(text, btn){
+    var done = function(){
+      var old = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(function(){ btn.textContent = old; }, 1400);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, function(){ fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  }
+
+  function fallback(text, done){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  /* ---------- 7. wiring ---------- */
+
+  input.addEventListener('input', render);
+  ['owner','access','pin','desc','valid'].forEach(function(id){
+    $(id).addEventListener('change', render);
+  });
+
+  $('sampleBtn').addEventListener('click', function(){
+    input.value = JSON.stringify(SAMPLE, null, 2);
+    render();
+  });
+
+  $('clearBtn').addEventListener('click', function(){
+    input.value = '';
+    render();
+    input.focus();
+  });
+
+  copyBtn.addEventListener('click', function(){
+    if(currentMutation) copyText(currentMutation, copyBtn);
+  });
+
+  $('copyQuery').addEventListener('click', function(e){
+    e.preventDefault();
+    copyText($('readQuery').textContent, e.currentTarget);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
